@@ -1,11 +1,12 @@
+import { auth } from "@/lib/auth";
 import { prisma } from "@/prisma/src";
+import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 //@ts-ignore
 import youtubesearchapi from "youtube-search-api";
 import { z } from "zod";
 
 const createStreamSchema = z.object({
-  creatorId: z.string(),
   url: z
     .string()
     .url("Invalid URL format") // Ensures it's a valid URL
@@ -17,18 +18,44 @@ const createStreamSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(auth);
+
+    if (!session) {
+      return NextResponse.json(
+        {
+          message: "unauthorized",
+        },
+        { status: 404 }
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: {
+        email: session.user?.email || "",
+      },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          message: "user not found",
+        },
+        { status: 404 }
+      );
+    }
+
     const body = await req.json();
 
     const data = createStreamSchema.parse(body);
     const extractedId = data.url.split("?v=")[1];
 
-    const res: any = await youtubesearchapi.GetVideoDetails(extractedId);
-    const thumbnails = res.thumbnail.thumbnails;
-    thumbnails.sort((a: any, b: any) => (a.width < b.width ? -1 : 1));
+    const res: any = await youtubesearchapi?.GetVideoDetails(extractedId);
+    const thumbnails = res?.thumbnail?.thumbnails;
+    thumbnails?.sort((a: any, b: any) => (a.width < b.width ? -1 : 1));
 
     const newStream = await prisma.streams.create({
       data: {
-        userId: data?.creatorId,
+        userId: user.id,
         url: data?.url,
         extractedId,
         type: "Youtube",
@@ -74,16 +101,24 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const streams = await prisma.streams.findMany({
-    where: {
-      userId: creatorId,
-    },
-  });
+  const [streams, currentStream] = await Promise.all([
+    prisma.streams.findMany({
+      where: {
+        userId: creatorId,
+      },
+    }),
+    prisma.currentStream.findFirst({
+      where: {
+        userId: creatorId,
+      },
+    }),
+  ]);
 
   return NextResponse.json(
     {
       message: "all streams",
       streams,
+      currentStream,
     },
     { status: 200 }
   );

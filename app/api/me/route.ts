@@ -1,9 +1,18 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/prisma/src";
 import { getServerSession } from "next-auth";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const creatorId = req.nextUrl.searchParams.get("creatorId");
+  if (!creatorId) {
+    return NextResponse.json(
+      {
+        message: "creatorId not found",
+      },
+      { status: 404 }
+    );
+  }
   try {
     const session = await getServerSession(auth);
 
@@ -35,7 +44,19 @@ export async function GET() {
 
     const allStreams = await prisma.streams.findMany({
       where: {
-        userId: user.id,
+        userId: creatorId,
+      },
+      include: {
+        _count: {
+          select: {
+            upvote: true,
+          },
+        },
+        upvote: {
+          where: {
+            userId: user.id,
+          },
+        },
       },
     });
 
@@ -53,7 +74,10 @@ export async function GET() {
     return NextResponse.json(
       {
         message: "error",
-        error: error instanceof Error ? error.message : String(error) || "Unknown error",
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error) || "Unknown error",
       },
       { status: 500 }
     );

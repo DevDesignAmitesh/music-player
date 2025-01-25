@@ -18,17 +18,18 @@ model User {
 }
 
 model Streams {
-  id          String     @id @default(uuid())
-  type        StreamType
-  url         String?    @default("")
-  title       String?    @default("")
-  smallImg    String?    @default("")
-  bigImg      String?    @default("")
-  extractedId String?    @default("")
-  active      Boolean    @default(true)
-  userId      String
-  user        User       @relation(fields: [userId], references: [id])
-  upvote      Upvote[]
+  id            String         @id @default(uuid())
+  type          StreamType
+  url           String?        @default("")
+  title         String?        @default("")
+  smallImg      String?        @default("")
+  bigImg        String?        @default("")
+  extractedId   String?        @default("")
+  active        Boolean        @default(true)
+  userId        String
+  user          User           @relation(fields: [userId], references: [id])
+  upvote        Upvote[]
+  CurrentStream CurrentStream?
 }
 
 model Upvote {
@@ -39,6 +40,12 @@ model Upvote {
   stream   Streams @relation(fields: [streamId], references: [id])
 
   @@unique([userId, streamId])
+}
+
+model CurrentStream {
+  userId   String  @id
+  streamId String  @unique
+  stream   Streams @relation(fields: [streamId], references: [id])
 }
 
 enum StreamType {

@@ -1,10 +1,11 @@
 import GoogleProvider from "next-auth/providers/google";
-import type { AuthOptions } from "next-auth";
+import { AuthOptions } from "next-auth";
 import { prisma } from "@/prisma/src";
 
 interface RateLimiter {
   timestamps: Date[];
 }
+
 const userRateLimits = new Map<string, RateLimiter>();
 
 export const rateLimit = (
@@ -57,16 +58,13 @@ export const auth: AuthOptions = {
         return false; // Reject sign-in
       }
 
-      const isAllowed = rateLimit(
-        user.email,
-        rateLimitCount,
-        rateLimitInterval
-      );
+      const isAllowed = rateLimit(user.email, rateLimitCount, rateLimitInterval);
 
       if (!isAllowed) {
         console.log(`Rate limit exceeded for user ${user.email}`);
         return false; // Reject sign-in
       }
+
       const existingUser = await prisma.user.findUnique({
         where: {
           email: user.email,
@@ -74,7 +72,7 @@ export const auth: AuthOptions = {
       });
 
       if (existingUser) {
-        return true;
+        return true; // Return true if user already exists
       }
 
       await prisma.user.create({
@@ -90,13 +88,21 @@ export const auth: AuthOptions = {
     },
     async jwt({ token, user }: any) {
       if (user) {
-        token.email = user.email; // Persist email in the token
+        // Persist all required fields in the JWT token
+        token.email = user.email;
+        token.id = user.id;
+        token.name = user.name;
+        token.image = user.image;
       }
       return token;
     },
     async session({ session, token }: any) {
       if (token) {
+        // Attach all user details to the session
         session.user.email = token.email;
+        session.user.id = token.id;
+        session.user.name = token.name;
+        session.user.image = token.image;
       }
       return session;
     },
